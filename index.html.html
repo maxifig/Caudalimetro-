@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Medidor de caudal másico Coriolis: cómo funciona</title>
+<style>
+:root{--bg:#f3f5f6;--surface:#ffffff;--ink:#14232b;--muted:#51636d;--line:#d3dce1;--teal:#0b7f86;--amber:#c4571a;--stage:#e6edf0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10181c;--surface:#18242a;--ink:#e6eef1;--muted:#9bb0b9;--line:#2c3c44;--teal:#4cc3c9;--amber:#f0925a;--stage:#0c1215;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10181c;--surface:#18242a;--ink:#e6eef1;--muted:#9bb0b9;--line:#2c3c44;--teal:#4cc3c9;--amber:#f0925a;--stage:#0c1215;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Georgia,"Times New Roman",serif}
+main{max-width:720px;margin:0 auto;padding:28px 18px 56px}
+h1{font:700 1.9rem/1.2 "Trebuchet MS",Verdana,sans-serif;margin:0 0 8px}
+h2{font:700 1.25rem/1.3 "Trebuchet MS",Verdana,sans-serif;margin:36px 0 10px;color:var(--teal)}
+p{margin:0 0 12px}.lead{color:var(--muted);font-size:1.05rem}
+.stage{position:relative;background:var(--stage);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:14px 0}
+#cap{position:absolute;left:12px;right:12px;top:10px;font:.85rem/1.35 "Trebuchet MS",Verdana,sans-serif;color:var(--muted);pointer-events:none}
+#zb{font:inherit;padding:4px 12px;border-radius:999px;border:1px solid var(--teal);background:transparent;color:var(--teal);cursor:pointer}
+#c3d{display:block;width:100%;height:340px;touch-action:none;cursor:grab}
+.ctl{padding:12px 14px;border-top:1px solid var(--line);background:var(--surface);font:.9rem/1.4 "Trebuchet MS",Verdana,sans-serif}
+.ctl label{display:flex;justify-content:space-between;gap:10px;margin-bottom:4px}
+input[type=range]{width:100%;accent-color:var(--teal)}
+#sig{display:block;width:100%;height:90px;margin-top:8px;background:var(--stage);border-radius:6px}
+.leg{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;color:var(--muted);font-size:.82rem}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+ol,ul{padding-left:22px;margin:0 0 12px}li{margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font:.92rem/1.4 "Trebuchet MS",Verdana,sans-serif;margin:8px 0}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600}
+.note{border-left:4px solid var(--amber);background:var(--surface);padding:10px 14px;border-radius:0 8px 8px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Medidor de caudal másico Coriolis</h1>
+<p class="lead">Cómo un tubo que vibra mide, al mismo tiempo, cuánta masa pasa, su densidad y su temperatura.</p>
+
+<h2>Qué es</h2>
+<p>Es un instrumento que mide directamente la masa de fluido que circula por la tubería, en kg/h. No depende de la presión, la viscosidad ni la temperatura del producto, por eso se usa con aceites, combustibles y líquidos calientes. En el equipo del ejemplo (Siemens) la pantalla muestra caudal másico, densidad y temperatura.</p>
+
+<h2>Animación: el principio de funcionamiento</h2>
+<p>Empieza con el medidor completo visto desde fuera y se acerca solo hasta el interior de la carcasa. También puedes usar el control de vista, girar el modelo arrastrándolo y mover el caudal para ver cómo se retuerce el tubo.</p>
+<div class="stage">
+<canvas id="c3d" aria-label="Modelo 3D de un medidor Coriolis, por fuera y por dentro"></canvas><div id="cap"></div>
+<div class="ctl">
+<label for="zm"><span>Vista: exterior a interior</span><button id="zb" type="button">Acercar al interior</button></label>
+<input id="zm" type="range" min="0" max="100" value="0">
+<label for="fl" style="margin-top:8px"><span>Caudal simulado</span><b id="rd">0 kg/h</b></label>
+<input id="fl" type="range" min="0" max="100" value="60">
+<label for="ex" style="margin-top:8px"><span>Exagerar la torsión</span><b id="exv">x1</b></label>
+<input id="ex" type="range" min="1" max="3" step="0.5" value="1.5">
+<canvas id="sig"></canvas>
+<div class="leg"><span><i style="background:#e8743b"></i>Sensor de entrada</span><span><i style="background:#2a9d8f"></i>Sensor de salida</span><span>Desfase entre ambas = caudal másico</span></div>
+</div>
+</div>
+<p style="color:var(--muted);font-size:.88rem">En la realidad el tubo vibra a cientos de Hz con amplitudes de micras; aquí se ralentiza y exagera para verlo.</p>
+
+<h2>Paso a paso</h2>
+<ol>
+<li><b>El excitador hace vibrar el tubo.</b> Una bobina electromagnética lo mueve arriba y abajo a su frecuencia natural.</li>
+<li><b>Sin flujo,</b> las dos patas del tubo se mueven al mismo tiempo. Los dos sensores de posición generan señales iguales y en fase.</li>
+<li><b>Con flujo,</b> el fluido sube por una pata y baja por la otra. La fuerza de Coriolis empuja cada pata en sentido contrario y el tubo se retuerce un poco.</li>
+<li><b>El transmisor mide el desfase</b> en el tiempo entre ambos sensores. Cuanto más masa pasa, mayor es el desfase.</li>
+</ol>
+
+<h2>Qué mide y cómo</h2>
+<table>
+<tr><th>Variable</th><th>Cómo se obtiene</th><th>En la foto</th></tr>
+<tr><td>Caudal másico</td><td>Desfase entre los dos sensores</td><td>1512.15 kg/h</td></tr>
+<tr><td>Densidad</td><td>Frecuencia de vibración: más masa en el tubo, menor frecuencia</td><td>865.17 kg/m³</td></tr>
+<tr><td>Temperatura</td><td>Sensor de temperatura en el tubo (también compensa el cálculo)</td><td>93.66 °C</td></tr>
+</table>
+<p>Con la masa y la densidad el equipo también puede calcular el caudal volumétrico: volumen = masa ÷ densidad. Con los datos de la foto serían unos 1.75 m³/h.</p>
+
+<h2>Cómo leer la pantalla</h2>
+<ul>
+<li><b>MASS FLOW:</b> caudal másico instantáneo. La barra inferior indica en qué punto del rango está (0 a 43750 kg/h en este equipo).</li>
+<li><b>DENSITY y MEDIUM TEMP:</b> densidad y temperatura del producto en ese momento.</li>
+<li><b>Botones de flecha:</b> permiten navegar por las pantallas y el menú. Conviene no cambiar parámetros sin autorización.</li>
+</ul>
+
+<h2>Buenas prácticas</h2>
+<div class="note">
+<ul style="margin:0">
+<li>Respeta la flecha grabada en el tubo: indica el sentido de flujo de referencia.</li>
+<li>El tubo debe ir siempre lleno. El aire o las burbujas alteran la densidad y la medición.</li>
+<li>Evita vibraciones fuertes cercanas y tensiones en las bridas.</li>
+<li>Si el valor no es cero con la línea parada y llena, puede hacer falta un ajuste de cero.</li>
+</ul>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+const cv=document.getElementById('c3d');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));
+const S=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(42,1,0.1,100);
+cam.position.set(0,3.6,8.2);cam.lookAt(0,0,1.6);
+S.add(new THREE.HemisphereLight(0xffffff,0x4a5a63,1.1));
+const dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(3,6,4);S.add(dl);
+const root=new THREE.Group();root.position.set(0,-0.2,-1.4);root.rotation.set(0.25,-0.55,0);S.add(root);
+
+// trayectoria en U
+const pts=[];
+for(let i=0;i<=20;i++)pts.push(new THREE.Vector3(-1,0,-0.5+3*i/20));
+for(let i=1;i<20;i++){const a=Math.PI-Math.PI*i/20;pts.push(new THREE.Vector3(Math.cos(a),0,2.5+Math.sin(a)));}
+for(let i=0;i<=20;i++)pts.push(new THREE.Vector3(1,0,2.5-3*i/20));
+const curve=new THREE.CatmullRomCurve3(pts);
+const tg=new THREE.TubeGeometry(curve,160,0.13,10,false);
+const orig=tg.attributes.position.array.slice();
+const tube=new THREE.Mesh(tg,new THREE.MeshStandardMaterial({color:0x8fa4ae,metalness:0.5,roughness:0.35,transparent:true,opacity:0.55}));
+root.add(tube);
+const base=new THREE.Mesh(new THREE.BoxGeometry(3.2,0.7,0.6),new THREE.MeshStandardMaterial({color:0x5b6c75,metalness:0.4,roughness:0.5}));
+base.position.set(0,0,-0.8);root.add(base);
+const ext=new THREE.Group();root.add(ext);ext.add(base);
+const gm=new THREE.MeshStandardMaterial({color:0xb7c3c9,metalness:0.6,roughness:0.4,transparent:true});
+const tm=new THREE.MeshStandardMaterial({color:0x0b7f86,metalness:0.3,roughness:0.5,transparent:true});
+const dc=document.createElement('canvas');dc.width=256;dc.height=192;
+const q2=dc.getContext('2d');q2.fillStyle='#f4f7f7';q2.fillRect(0,0,256,192);q2.fillStyle='#111';
+q2.font='bold 20px sans-serif';q2.fillText('MASS FLOW',10,34);q2.font='bold 34px sans-serif';q2.fillText('1512.15 kg/h',10,78);
+q2.font='20px sans-serif';q2.fillText('DENSITY  865.17 kg/m³',10,130);q2.fillText('TEMP  93.66 °C',10,164);
+const dm=new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(dc),transparent:true});
+base.material.transparent=true;
+const mats=[gm,tm,dm,base.material];
+function cyl(r,l,m,px,py,pz,ax){const c=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,32),m);if(ax==='z')c.rotation.x=Math.PI/2;if(ax==='x')c.rotation.z=Math.PI/2;c.position.set(px,py,pz);ext.add(c);return c;}
+cyl(1.5,4.9,gm,0,0,1.95,'z');
+const dome=new THREE.Mesh(new THREE.SphereGeometry(1.5,32,12,0,Math.PI*2,0,Math.PI/2),gm);dome.rotation.x=Math.PI/2;dome.position.z=4.4;ext.add(dome);
+[-1,1].forEach(k=>{cyl(0.45,2.2,gm,k*2.7,0,-0.8,'x');cyl(0.9,0.2,gm,k*3.55,0,-0.8,'x');});
+cyl(0.4,0.8,gm,0,1.8,0.3);cyl(0.8,1.3,gm,0,2.45,0.3,'z');cyl(0.85,0.25,tm,0,2.45,0.85,'z');
+const disp=new THREE.Mesh(new THREE.PlaneGeometry(1.15,0.86),dm);disp.position.set(0,2.45,0.99);ext.add(disp);
+
+function mk(c,s){return new THREE.Mesh(new THREE.BoxGeometry(s,s,s),new THREE.MeshStandardMaterial({color:c}));}
+const drv=mk(0x0b7f86,0.3),sL=mk(0xe8743b,0.22),sR=mk(0x2a9d8f,0.22);
+root.add(drv,sL,sR);
+
+// partículas de fluido
+const N=80,pg=new THREE.BufferGeometry();
+pg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(N*3),3));
+const pm=new THREE.Points(pg,new THREE.PointsMaterial({color:0xf2b630,size:0.17,sizeAttenuation:true}));
+root.add(pm);
+
+const W=2*Math.PI*0.8,AMP=0.55,ZF=3.5;
+let flow=0.6,TW=0.3;
+function def(x,y,z,t){
+  const f=Math.min(1,Math.max(0,z/ZF));
+  const dy=AMP*Math.sin(t*W)*f*f;
+  const a=TW*flow*Math.cos(t*W)*f;
+  const c=Math.cos(a),s=Math.sin(a);
+  return [x*c-y*s,x*s+y*c+dy,z];
+}
+// controles
+const fl=document.getElementById('fl'),ex=document.getElementById('ex'),rd=document.getElementById('rd'),exv=document.getElementById('exv');
+function upd(){flow=fl.value/100;TW=0.2*ex.value;rd.textContent=Math.round(flow*43750*0.2)+' kg/h';exv.textContent='x'+ex.value;}
+fl.oninput=ex.oninput=upd;upd();
+
+// rotación con el dedo o ratón
+let drag=false,lx=0,ly=0;
+cv.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointerup',()=>drag=false);
+cv.addEventListener('pointermove',e=>{if(!drag)return;root.rotation.y+=(e.clientX-lx)*0.01;root.rotation.x=Math.max(-0.2,Math.min(1.2,root.rotation.x+(e.clientY-ly)*0.01));lx=e.clientX;ly=e.clientY;});
+
+// gráfica de señales
+const sg=document.getElementById('sig'),g=sg.getContext('2d');
+const H=240,hl=[],hr=[];
+function plot(){
+  const w=sg.width=sg.clientWidth*devicePixelRatio,h=sg.height=sg.clientHeight*devicePixelRatio;
+  g.lineWidth=2*devicePixelRatio;
+  [[hl,'#e8743b'],[hr,'#2a9d8f']].forEach(([a,c])=>{
+    g.strokeStyle=c;g.beginPath();
+    a.forEach((v,i)=>{const x=i/H*w,y=h/2-v*h*0.9;i?g.lineTo(x,y):g.moveTo(x,y);});
+    g.stroke();
+  });
+}
+function size(){const w=cv.clientWidth,h=cv.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
+addEventListener('resize',size);size();
+
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const zm=document.getElementById('zm'),zb=document.getElementById('zb'),capEl=document.getElementById('cap');
+const c0=new THREE.Vector3(1,3.2,14),c1=new THREE.Vector3(0,3.6,8.2),l0=new THREE.Vector3(0,1,0.8),l1=new THREE.Vector3(0,0,1.6);
+let zv=0,zt=0,touched=false;
+zm.oninput=()=>{touched=true;zv=zt=zm.value/100;};
+zb.onclick=()=>{touched=true;zt=zt>0.5?0:1;if(reduce)zv=zt;};
+setTimeout(()=>{if(!touched){zt=1;if(reduce)zv=1;}},1800);
+const clock=new THREE.Clock();let t=0,ps=0;
+function frame(){
+  const dt=clock.getDelta();if(!reduce)t+=dt;ps+=dt*flow*0.3;
+  const p=tg.attributes.position.array;
+  for(let i=0;i<p.length;i+=3){const d=def(orig[i],orig[i+1],orig[i+2],t);p[i]=d[0];p[i+1]=d[1];p[i+2]=d[2];}
+  tg.attributes.position.needsUpdate=true;tg.computeVertexNormals();
+  const pp=pg.attributes.position.array;
+  for(let i=0;i<N;i++){const u=(i/N+ps)%1,q=curve.getPointAt(u),d=def(q.x,q.y,q.z,t);pp[i*3]=d[0];pp[i*3+1]=d[1];pp[i*3+2]=d[2];}
+  pg.attributes.position.needsUpdate=true;
+  let d=def(0,0,3.5,t);drv.position.set(d[0],d[1]+0.45,d[2]-0.1);
+  const a=def(-1,0,1.6,t),b=def(1,0,1.6,t);
+  sL.position.set(a[0],a[1]+0.28,a[2]);sR.position.set(b[0],b[1]+0.28,b[2]);
+  hl.push(a[1]);hr.push(b[1]);if(hl.length>H){hl.shift();hr.shift();}
+  if(zv!==zt){const st=dt/3.5;zv=zt>zv?Math.min(zt,zv+st):Math.max(zt,zv-st);zm.value=Math.round(zv*100);}
+  const s=zv*zv*(3-2*zv);
+  cam.position.lerpVectors(c0,c1,s);cam.lookAt(l0.clone().lerp(l1,s));
+  const o=1-Math.min(1,Math.max(0,(s-0.35)/0.4));
+  mats.forEach(m=>{m.opacity=o;m.depthWrite=o>0.98;});ext.visible=o>0.01;
+  const tx=s<0.5?'Vista exterior: bridas, carcasa del sensor y transmisor con pantalla.':'Dentro de la carcasa: el tubo en U vibra y se retuerce con el flujo.';
+  if(tx!==capEl.textContent)capEl.textContent=tx;
+  zb.textContent=zt>0.5?'Alejar':'Acercar al interior';
+  plot();R.render(S,cam);requestAnimationFrame(frame);
+}
+frame();
+})();
+</script>
+</body>
+</html>
